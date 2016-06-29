@@ -83,14 +83,10 @@ class LifxDriver {
 		if (props.on === false) {
 			power = 'off';
 		}
-		var brightness = 0;
-		if (props.brightness > 0) {
-			brightness = props.brightness / 100;
-		}
+
 
 		return lifx.setState('id:' + device.specs.deviceId, {
 				power: power,
-				brightness: brightness,
 				color: props.colour,
 				duration: props.duration
 			})
@@ -115,12 +111,10 @@ class LifxDriver {
 					if (e.error === 'Invalid token') {
 						var err = new Error('Not authenticated');
 						err.type = 'Authentication';
-					}
-					else if(e.error === 'Token required') {
+					} else if (e.error === 'Token required') {
 						var err = new Error('Not authenticated');
 						err.type = 'Authentication';
-					}
-					else if (e.error.startsWith('Unable to parse color')) {
+					} else if (e.error.startsWith('Unable to parse color')) {
 						var err = new Error('Unable to parse colour');
 						err.type = 'BadRequest';
 					} else {
@@ -135,27 +129,149 @@ class LifxDriver {
 	}
 
 	capability_toggle(device, props) {
-		return new Promise(function(resolve) {
 
-		});
+
+		return lifx.toggle('id:' + device.specs.deviceId, {
+
+			})
+			.then(function(result) {
+				if (result.results[0].status === 'ok') {
+					return {
+						toggled: true
+					};
+				} else if (result.results[0].status === 'offline') {
+					var e = new Error('Unable to connect to bulb');
+					e.type = 'Connection';
+					throw e;
+				} else {
+					var e = new Error(result);
+					e.type = 'Driver';
+					throw e;
+				}
+
+			})
+			.catch(function(e) {
+				if (!e.type) {
+					if (e.error === 'Invalid token') {
+						var err = new Error('Not authenticated');
+						err.type = 'Authentication';
+					} else if (e.error === 'Token required') {
+						var err = new Error('Not authenticated');
+						err.type = 'Authentication';
+					} else if (e.error.startsWith('Unable to parse color')) {
+						var err = new Error('Unable to parse colour');
+						err.type = 'BadRequest';
+					} else {
+						var err = new Error(e.error);
+						err.type = 'Device';
+					}
+				} else {
+					var err = e;
+				}
+				throw err;
+			});
 	}
 
 	capability_breatheEffect(device, props) {
-		return new Promise(function(resolve) {
 
-		});
+		var newProps = {
+			color: props.colour,
+			period: props.period,
+			cycles: props.cycles,
+			persist: props.persist,
+			peak: props.peak,
+			power_on: true
+		};
+		if (props.fromColour) {
+			newProps.from_color = props.fromColour;
+		}
+		return lifx.breathe('id:' + device.specs.deviceId, newProps)
+			.then(function(result) {
+				if (result.results[0].status === 'ok') {
+					return {
+						processed: true
+					};
+				} else if (result.results[0].status === 'offline') {
+					var e = new Error('Unable to connect to bulb');
+					e.type = 'Connection';
+					throw e;
+				} else {
+					var e = new Error(result);
+					e.type = 'Driver';
+					throw e;
+				}
+
+			})
+			.catch(function(e) {
+				if (!e.type) {
+					if (e.error === 'Invalid token') {
+						var err = new Error('Not authenticated');
+						err.type = 'Authentication';
+					} else if (e.error === 'Token required') {
+						var err = new Error('Not authenticated');
+						err.type = 'Authentication';
+					} else if (e.error.startsWith('Unable to parse color')) {
+						var err = new Error('Unable to parse colour');
+						err.type = 'BadRequest';
+					} else {
+						var err = new Error(e.error);
+						err.type = 'Device';
+					}
+				} else {
+					var err = e;
+				}
+				throw err;
+			});
 	}
 
 	capability_pulseEffect(device, props) {
-		return new Promise(function(resolve) {
+		var newProps = {
+			color: props.colour,
+			period: props.period,
+			cycles: props.cycles,
+			persist: props.persist,
+			power_on: true
+		};
+		if (props.fromColour) {
+			newProps.from_color = props.fromColour;
+		}
+		return lifx.breathe('id:' + device.specs.deviceId, newProps)
+			.then(function(result) {
+				if (result.results[0].status === 'ok') {
+					return {
+						processed: true
+					};
+				} else if (result.results[0].status === 'offline') {
+					var e = new Error('Unable to connect to bulb');
+					e.type = 'Connection';
+					throw e;
+				} else {
+					var e = new Error(result);
+					e.type = 'Driver';
+					throw e;
+				}
 
-		});
-	}
-
-	capability_cycleEffect(device, props) {
-		return new Promise(function(resolve) {
-
-		});
+			})
+			.catch(function(e) {
+				if (!e.type) {
+					if (e.error === 'Invalid token') {
+						var err = new Error('Not authenticated');
+						err.type = 'Authentication';
+					} else if (e.error === 'Token required') {
+						var err = new Error('Not authenticated');
+						err.type = 'Authentication';
+					} else if (e.error.startsWith('Unable to parse color')) {
+						var err = new Error('Unable to parse colour');
+						err.type = 'BadRequest';
+					} else {
+						var err = new Error(e.error);
+						err.type = 'Device';
+					}
+				} else {
+					var err = e;
+				}
+				throw err;
+			});
 	}
 }
 
