@@ -37,7 +37,7 @@ class LifxDriver {
 				label: 'Get access token'
 			},
 			dataLabel: 'Access token',
-			next: '/authentication/speaker/lifx/0'
+			next: '/authentication/light/lifx/0'
 		}];
 	}
 
