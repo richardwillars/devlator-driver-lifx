@@ -28,6 +28,10 @@ class LifxDriver {
 		return 'http';
 	}
 
+	_buildColourString(hue,sat,bri) {
+		return 'hue:'+hue+' saturation:'+sat+' brightness:'+bri;
+	}
+
 	getAuthenticationProcess() {
 		return [{
 			type: 'RequestData',
@@ -46,10 +50,17 @@ class LifxDriver {
 		var newSettings = {
 			token: props.data
 		};
-		this.driverSettingsObj.set(newSettings).then(function() {
+		return this.driverSettingsObj.set(newSettings).then(function() {
 			self.driverSettings = newSettings;
 			lifx.init(self.driverSettings.token);
-		});
+
+			//check if the token is valid by calling discover
+			return self.discover();
+		}).then(function() {
+			return {"success":true};
+		}).catch(function(err) {
+			return {"success":false,"message":err.error};
+		})
 	}
 
 	discover() {
@@ -78,7 +89,7 @@ class LifxDriver {
 	}
 
 	capability_setState(device, props) {
-
+		var self = this;
 		var power = 'on';
 		if (props.on === false) {
 			power = 'off';
@@ -87,7 +98,7 @@ class LifxDriver {
 
 		return lifx.setState('id:' + device.specs.deviceId, {
 				power: power,
-				color: props.colour,
+				color: self._buildColourString(props.colour.hue,props.colour.saturation,props.colour.brightness),
 				duration: props.duration
 			})
 			.then(function(result) {
@@ -175,7 +186,7 @@ class LifxDriver {
 	capability_breatheEffect(device, props) {
 
 		var newProps = {
-			color: props.colour,
+			color: this._buildColourString(props.colour.hue,props.colour.saturation,props.colour.brightness),
 			period: props.period,
 			cycles: props.cycles,
 			persist: props.persist,
@@ -183,7 +194,7 @@ class LifxDriver {
 			power_on: true
 		};
 		if (props.fromColour) {
-			newProps.from_color = props.fromColour;
+			newProps.from_color = self._buildColourString(props.fromColour.hue,props.fromColour.saturation,props.fromColour.brightness);
 		}
 		return lifx.breathe('id:' + device.specs.deviceId, newProps)
 			.then(function(result) {
@@ -226,14 +237,14 @@ class LifxDriver {
 
 	capability_pulseEffect(device, props) {
 		var newProps = {
-			color: props.colour,
+			color: this._buildColourString(props.colour.hue,props.colour.saturation,props.colour.brightness),
 			period: props.period,
 			cycles: props.cycles,
 			persist: props.persist,
 			power_on: true
 		};
 		if (props.fromColour) {
-			newProps.from_color = props.fromColour;
+			newProps.from_color = this._buildColourString(props.fromColour.hue,props.fromColour.saturation,props.fromColour.brightness);
 		}
 		return lifx.breathe('id:' + device.specs.deviceId, newProps)
 			.then(function(result) {
