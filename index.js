@@ -41,7 +41,7 @@ class LifxDriver {
 				label: 'Get access token'
 			},
 			dataLabel: 'Access token',
-			next: '/authentication/speaker/lifx/9'
+			next: '/authentication/light/lifx/0'
 		}];
 	}
 
@@ -50,10 +50,17 @@ class LifxDriver {
 		var newSettings = {
 			token: props.data
 		};
-		this.driverSettingsObj.set(newSettings).then(function() {
+		return this.driverSettingsObj.set(newSettings).then(function() {
 			self.driverSettings = newSettings;
 			lifx.init(self.driverSettings.token);
-		});
+
+			//check if the token is valid by calling discover
+			return self.discover();
+		}).then(function() {
+			return {"success":true};
+		}).catch(function(err) {
+			return {"success":false,"message":err.error};
+		})
 	}
 
 	discover() {
