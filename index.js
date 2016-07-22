@@ -28,6 +28,16 @@ class LifxDriver {
 		return 'http';
 	}
 
+	setEventEmitter(eventEmitter) {
+		this.eventEmitter = eventEmitter;
+		//when something happens with this bulb you can emit an event to let the homebox platform know:
+		//it should only emit events which are valid types (see documentation on lights for more info)
+		//this.eventEmitter.emit('eventType','driverId','deviceId')
+
+		//E.g:
+		//this.eventEmitter.emit('on','lifx','abc123');
+	}
+
 	_buildColourString(hue,sat,bri) {
 		return 'hue:'+hue+' saturation:'+sat+' brightness:'+bri;
 	}
