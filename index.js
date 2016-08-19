@@ -38,6 +38,10 @@ class LifxDriver {
 		//this.eventEmitter.emit('on','lifx','abc123');
 	}
 
+	initDevices(devices) {
+		
+	}
+
 	_buildColourString(hue,sat,bri) {
 		return 'hue:'+hue+' saturation:'+sat+' brightness:'+bri;
 	}
