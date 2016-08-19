@@ -2,7 +2,7 @@
   "name": "homebox-driver-lifx",
   "license": "MIT",
   "description": "Allows the Homebox platform to talk to Lifx devices",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "maintainers": [
     {
       "name": "Richard Willars",
