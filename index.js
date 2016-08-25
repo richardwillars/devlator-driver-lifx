@@ -55,7 +55,13 @@ class LifxDriver {
                 label: 'Get access token'
             },
             dataLabel: 'Access token',
-            next: '/authenticate/light/lifx/0'
+            next: {
+                http: '/authenticate/light/lifx/0',
+                socket: {
+                    event: 'authenticationStep',
+                    step: 0
+                }
+            }
         }];
     }
 
@@ -103,6 +109,7 @@ class LifxDriver {
                 return devices;
             })
             .catch(function(err) {
+                err.type = 'Authentication';
                 throw err;
             });
     }
@@ -121,7 +128,7 @@ class LifxDriver {
             })
             .then(function(result) {
                 if (result.results[0].status === 'ok') {
-                    
+
                 } else if (result.results[0].status === 'offline') {
                     var e = new Error('Unable to connect to bulb');
                     e.type = 'Connection';
@@ -134,9 +141,9 @@ class LifxDriver {
 
                 return lifx.listLights(device.specs.deviceId);
             })
-            .then(function(response){
-                self.eventEmitter.emit('state','lifx',device._id,{
-                    on: response[0].power==='on',
+            .then(function(response) {
+                self.eventEmitter.emit('state', 'lifx', device._id, {
+                    on: response[0].power === 'on',
                     colour: {
                         hue: response[0].color.hue,
                         saturation: response[0].color.saturation,
@@ -187,9 +194,9 @@ class LifxDriver {
                 }
                 return lifx.listLights(device.specs.deviceId);
             })
-            .then(function(response){
-                self.eventEmitter.emit('state','lifx',device._id,{
-                    on: response[0].power==='on',
+            .then(function(response) {
+                self.eventEmitter.emit('state', 'lifx', device._id, {
+                    on: response[0].power === 'on',
                     colour: {
                         hue: response[0].color.hue,
                         saturation: response[0].color.saturation,
