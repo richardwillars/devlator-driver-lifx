@@ -2,7 +2,7 @@
   "name": "homebox-driver-lifx",
   "license": "MIT",
   "description": "Allows the Homebox platform to talk to Lifx devices",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "maintainers": [
     {
       "name": "Richard Willars",
@@ -14,6 +14,11 @@
     "url": "https://github.com/richardwillars/homebox-driver-lifx.git"
   },
   "dependencies": {
-    "ya-lifx": "2.0.0"
+    "ya-lifx": "2.0.0",
+    "chai": "^3.5.0",
+    "mocha": "^3.0.2"
+  },
+  "scripts": {
+    "test": "node_modules/.bin/_mocha --recursive"
   }
 }
