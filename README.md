@@ -1,18 +1,18 @@
-#homebox-driver-lifx
+#devlator-driver-lifx
 
 Allows the Homebox platform to control Lifx devices on your local network.
 
 
 ## Requirements
 - node.js
-- Homebox - https://github.com/richardwillars/homebox
+- Devlator - https://github.com/richardwillars/devlator
 - Active Internet connection - Ethernet or WiFi (it uses HTTP to talk to the LIFX servers)
 
 ## Installation
 Navigate to the root of your Homebox installation and run
-> npm install homebox-driver-lifx
+> npm install devlator-driver-lifx
 
-Relaunch homebox by re-running
+Relaunch devlator by re-running
 > node app.js
 
 
