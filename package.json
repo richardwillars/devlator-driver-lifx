@@ -2,7 +2,7 @@
   "name": "thinglator-driver-lifx",
   "license": "MIT",
   "description": "Allows the Thinglator platform to talk to Lifx devices",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "maintainers": [{
     "name": "Richard Willars",
     "email": "richard@richardwillars.com"

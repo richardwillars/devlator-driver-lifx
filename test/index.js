@@ -110,6 +110,31 @@ describe('driver structure', () => {
 			expect(driverInstance.setEventEmitter).to.be.a.function;
 		});
 
+		it('should have a getEventEmitter method that returns the event emitter', () => {
+			var driverSettings = new class DriverSettings {
+				get() {
+					return Promise.resolve({});
+				}
+				set(settings) {
+					return Promise.resolve();
+				}
+			}
+
+			var interfaces = {
+				http: {}
+			};
+
+			var driver = require('../index');
+			var driverInstance = new driver(driverSettings, interfaces);
+			expect(driverInstance.getEventEmitter).to.be.a.function;
+			var eeMock = {
+				on: function() {},
+				emit: function() {}
+			};
+			driverInstance.setEventEmitter(eeMock);
+			expect(driverInstance.getEventEmitter()).to.equal(eeMock);
+		});
+
 		it('should have an initDevices method that accepts an array of devices to be initialised if required', () => {
 			var driverSettings = new class DriverSettings {
 				get() {
