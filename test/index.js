@@ -170,7 +170,7 @@ describe('driver structure', () => {
 	});
 
 	describe('capability methods', () => {
-		it('should have an \'capability_setState\' method that promises to set the state of a lightbulb', () => {
+		it('should have an \'capability_setHSBState\' method that promises to set the colour state of a lightbulb', () => {
 			var driverSettings = new class DriverSettings {
 				get() {
 					return Promise.resolve({});
@@ -186,7 +186,45 @@ describe('driver structure', () => {
 
 			var driver = require('../index');
 			var driverInstance = new driver(driverSettings, interfaces);
-			expect(driverInstance.capability_setState).to.be.a.function;
+			expect(driverInstance.capability_setHSBState).to.be.a.function;
+		});
+
+		it('should have an \'capability_setBrightnessState\' method that promises to set the brightness of a lightbulb', () => {
+			var driverSettings = new class DriverSettings {
+				get() {
+					return Promise.resolve({});
+				}
+				set(settings) {
+					return Promise.resolve();
+				}
+			}
+
+			var interfaces = {
+				http: {}
+			};
+
+			var driver = require('../index');
+			var driverInstance = new driver(driverSettings, interfaces);
+			expect(driverInstance.capability_setBrightnessState).to.be.a.function;
+		});
+
+		it('should have an \'capability_setBooleanState\' method that promises to turn a lightbulb on or off', () => {
+			var driverSettings = new class DriverSettings {
+				get() {
+					return Promise.resolve({});
+				}
+				set(settings) {
+					return Promise.resolve();
+				}
+			}
+
+			var interfaces = {
+				http: {}
+			};
+
+			var driver = require('../index');
+			var driverInstance = new driver(driverSettings, interfaces);
+			expect(driverInstance.capability_setBooleanState).to.be.a.function;
 		});
 
 		it('should have an \'capability_toggle\' method that promises to toggle a lightbulb', () => {

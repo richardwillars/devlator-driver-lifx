@@ -1,20 +1,22 @@
 {
   "name": "thinglator-driver-lifx",
   "license": "MIT",
-  "description": "Allows the Thinglator platform to talk to Lifx devices",
-  "version": "1.0.2",
-  "maintainers": [{
-    "name": "Richard Willars",
-    "email": "richard@richardwillars.com"
-  }],
+  "description": "Allows the Thinglator platform to talk to Lifx lights",
+  "version": "1.0.3",
+  "maintainers": [
+    {
+      "name": "Richard Willars",
+      "email": "richard@richardwillars.com"
+    }
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/richardwillars/thinglator-driver-lifx.git"
   },
   "dependencies": {
-    "ya-lifx": "2.0.0",
     "chai": "^3.5.0",
-    "mocha": "^3.0.2"
+    "mocha": "^3.0.2",
+    "ya-lifx": "2.0.0"
   },
   "scripts": {
     "test": "node_modules/.bin/_mocha --recursive"
