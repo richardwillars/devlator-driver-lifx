@@ -1,19 +1,17 @@
-'use strict';
-
-var lifx = require('ya-lifx');
+const lifx = require('ya-lifx');
 
 class LifxDriver {
-    constructor(driverSettingsObj, interfaces) {
-        var self = this;
-        this.driverSettingsObj = driverSettingsObj;
-
+    constructor() {
         this.driverSettings = {};
-        this.driverSettingsObj.get().then(function(settings) {
-            self.driverSettings = settings;
-            lifx.init(self.driverSettings.token);
-        });
+    }
 
-        this.interface = interfaces[this.getInterface()];
+    init(driverSettingsObj, commsInterface, eventEmitter) {
+        this.driverSettingsObj = driverSettingsObj;
+        this.eventEmitter = eventEmitter;
+        return this.driverSettingsObj.get().then((settings) => {
+            this.driverSettings = settings;
+            lifx.init(this.driverSettings.token);
+        });
     }
 
     getName() {
@@ -32,37 +30,26 @@ class LifxDriver {
         return this.eventEmitter;
     }
 
-    setEventEmitter(eventEmitter) {
-        this.eventEmitter = eventEmitter;
-        //when something happens with this bulb you can emit an event to let the thinglator platform know:
-        //it should only emit events which are valid types (see documentation on lights for more info)
-        //this.eventEmitter.emit('eventType','driverId','deviceId')
-
-        //E.g:
-        //this.eventEmitter.emit('on','lifx','abc123');
-    }
-
-    initDevices(devices) {
+    initDevices() {
 
     }
 
-    _buildColourString(hue, sat, bri) {
-        return 'hue:' + hue + ' saturation:' + sat + ' brightness:' + bri;
+    buildColourString(hue, sat, bri) {
+        return `hue:${hue} saturation:${sat} brightness:${bri}`;
     }
 
-    _getStatus(device,delay) {
-        var self = this;
-        setTimeout(function() {
-            lifx.listLights(device.specs.deviceId).then(function(response) {
+    getStatus(device, delay) {
+        setTimeout(() => {
+            lifx.listLights(device.specs.deviceId).then((response) => {
                 const resp = {
                     on: response[0].power === 'on',
                     colour: {
-                        hue: parseInt(response[0].color.hue),
+                        hue: parseInt(response[0].color.hue, 10),
                         saturation: response[0].color.saturation,
                         brightness: response[0].brightness
                     }
                 };
-                self.eventEmitter.emit('state', 'lifx', device._id, resp);
+                this.eventEmitter.emit('state', 'lifx', device._id, resp);
             });
         }, delay);
     }
@@ -70,14 +57,14 @@ class LifxDriver {
     getAuthenticationProcess() {
         return [{
             type: 'RequestData',
-            message: 'In order to use LIFX bulbs you must provide an access token. This can be obtained from your LIFX account settings',
+            message: 'In order to use LIFX bulbs you must provide an access token. This can be obtained from your LIFX account settings', // eslint-disable-line max-len
             button: {
                 url: 'https://cloud.lifx.com/settings',
                 label: 'Get access token'
             },
             dataLabel: 'Access token',
             next: {
-                http: '/authenticate/light/lifx/0',
+                http: '/authenticate/lifx/0',
                 socket: {
                     event: 'authenticationStep',
                     step: 0
@@ -87,284 +74,266 @@ class LifxDriver {
     }
 
     setAuthenticationStep0(props) {
-        var self = this;
-        var newSettings = {
+        const newSettings = {
             token: props.data
         };
-        return this.driverSettingsObj.set(newSettings).then(function() {
-            self.driverSettings = newSettings;
-            lifx.init(self.driverSettings.token);
+        return this.driverSettingsObj.set(newSettings).then(() => {
+            this.driverSettings = newSettings;
+            lifx.init(this.driverSettings.token);
 
-            //check if the token is valid by calling discover
-            return self.discover();
-        }).then(function() {
-            return {
-                "success": true
-            };
-        }).catch(function(err) {
-            return {
-                "success": false,
-                "message": err.error
-            };
-        })
+            // check if the token is valid by calling discover
+            return this.discover();
+        }).then(() => ({
+            success: true
+        })).catch(err => ({
+            success: false,
+            message: err.error
+        }));
     }
 
     discover() {
         return lifx.listLights()
-            .then(function(response) {
-                var devices = [];
-                for (var i in response) {
-                    var device = {
-                        deviceId: response[i].id,
-                        name: response[i].label,
-                        capabilities: {
+            .then((response) => {
+                const devices = [];
+                response.forEach((light) => {
+                    const device = {
+                        deviceId: light.id,
+                        name: light.label,
+                        commands: {
                             setHSBState: true,
                             setBrightnessState: true,
                             toggle: true,
                             setBooleanState: true,
                             breatheEffect: true,
                             pulseEffect: true
+                        },
+                        events: {
+                            state: true
                         }
                     };
                     devices.push(device);
-                }
+                });
                 return devices;
             })
-            .catch(function(err) {
-                err.type = 'Authentication';
-                throw err;
+            .catch((err) => {
+                const error = err;
+                error.type = 'Authentication';
+                throw error;
             });
     }
 
-    capability_setHSBState(device, props) {
-        var self = this;
-
-        return lifx.setState('id:' + device.specs.deviceId, {
-                power: 'on',
-                color: self._buildColourString(props.colour.hue, props.colour.saturation, props.colour.brightness),
-                duration: props.duration
-            })
-            .then(function(result) {
-                if (result.results[0].status === 'ok') {
-
-                } else if (result.results[0].status === 'offline') {
-                    var e = new Error('Unable to connect to bulb');
+    command_setHSBState(device, props) { // eslint-disable-line camelcase
+        return lifx.setState(`id:${device.specs.deviceId}`, {
+            power: 'on',
+            color: this.buildColourString(props.colour.hue, props.colour.saturation, props.colour.brightness),
+            duration: props.duration
+        })
+            .then((result) => {
+                if (result.results[0].status === 'offline') {
+                    const e = new Error('Unable to connect to bulb');
                     e.type = 'Connection';
                     throw e;
-                } else {
-                    var e = new Error(result);
+                } else if (result.results[0].status !== 'ok') {
+                    const e = new Error(result);
                     e.type = 'Driver';
                     throw e;
                 }
 
                 return lifx.listLights(device.specs.deviceId);
             })
-            .then(function(response) {
-               const resp = {
-                    on: response[0].power === 'on',
-                    colour: {
-                        hue: parseInt(response[0].color.hue),
-                        saturation: response[0].color.saturation,
-                        brightness: response[0].brightness
-                    }
-                };
-                self._getStatus(device,(props.duration*1000)+1000);
-                return resp;
-            })
-            .catch(function(e) {
-                if (!e.type) {
-                    if (e.error === 'Invalid token') {
-                        var err = new Error('Not authenticated');
-                        err.type = 'Authentication';
-                    } else if (e.error === 'Token required') {
-                        var err = new Error('Not authenticated');
-                        err.type = 'Authentication';
-                    } else if (e.error.startsWith('Unable to parse color')) {
-                        var err = new Error('Unable to parse colour');
-                        err.type = 'BadRequest';
-                    } else {
-                        var err = new Error(e.error);
-                        err.type = 'Device';
-                    }
-                } else {
-                    var err = e;
-                }
-                throw err;
-            });
-    }
-
-    capability_setBrightnessState(device, props) {
-        var self = this;
-  
-        return lifx.setState('id:' + device.specs.deviceId, {
-                power: 'on',
-                brightness: props.colour.brightness,
-                duration: props.duration
-            })
-            .then(function(result) {
-                if (result.results[0].status === 'ok') {
-
-                } else if (result.results[0].status === 'offline') {
-                    var e = new Error('Unable to connect to bulb');
-                    e.type = 'Connection';
-                    throw e;
-                } else {
-                    var e = new Error(result);
-                    e.type = 'Driver';
-                    throw e;
-                }
-
-                return lifx.listLights(device.specs.deviceId);
-            })
-            .then(function(response) {
-               const resp = {
-                    on: response[0].power === 'on',
-                    colour: {
-                        hue: parseInt(response[0].color.hue),
-                        saturation: response[0].color.saturation,
-                        brightness: response[0].brightness
-                    }
-                };
-                self._getStatus(device,(props.duration*1000)+1000);
-                return resp;
-            })
-            .catch(function(e) {
-                if (!e.type) {
-                    if (e.error === 'Invalid token') {
-                        var err = new Error('Not authenticated');
-                        err.type = 'Authentication';
-                    } else if (e.error === 'Token required') {
-                        var err = new Error('Not authenticated');
-                        err.type = 'Authentication';
-                    } else if (e.error.startsWith('Unable to parse color')) {
-                        var err = new Error('Unable to parse colour');
-                        err.type = 'BadRequest';
-                    } else {
-                        var err = new Error(e.error);
-                        err.type = 'Device';
-                    }
-                } else {
-                    var err = e;
-                }
-                throw err;
-            });
-    }
-
-    capability_toggle(device, props) {
-        var self = this;
-
-        return lifx.toggle('id:' + device.specs.deviceId, {
-
-            })
-            .then(function(result) {
-                if (result.results[0].status === 'ok') {
-
-                } else if (result.results[0].status === 'offline') {
-                    var e = new Error('Unable to connect to bulb');
-                    e.type = 'Connection';
-                    throw e;
-                } else {
-                    var e = new Error(result);
-                    e.type = 'Driver';
-                    throw e;
-                }
-                return lifx.listLights(device.specs.deviceId);
-            })
-            .then(function(response) {
+            .then((response) => {
                 const resp = {
                     on: response[0].power === 'on',
                     colour: {
-                        hue: parseInt(response[0].color.hue),
+                        hue: parseInt(response[0].color.hue, 10),
                         saturation: response[0].color.saturation,
                         brightness: response[0].brightness
                     }
                 };
-                self._getStatus(device,3000);
+                this.getStatus(device, (props.duration * 1000) + 1000);
                 return resp;
             })
-            .catch(function(e) {
+            .catch((e) => {
+                let err;
                 if (!e.type) {
                     if (e.error === 'Invalid token') {
-                        var err = new Error('Not authenticated');
+                        err = new Error('Not authenticated');
                         err.type = 'Authentication';
                     } else if (e.error === 'Token required') {
-                        var err = new Error('Not authenticated');
+                        err = new Error('Not authenticated');
                         err.type = 'Authentication';
                     } else if (e.error.startsWith('Unable to parse color')) {
-                        var err = new Error('Unable to parse colour');
+                        err = new Error('Unable to parse colour');
                         err.type = 'BadRequest';
                     } else {
-                        var err = new Error(e.error);
+                        err = new Error(e.error);
                         err.type = 'Device';
                     }
                 } else {
-                    var err = e;
+                    err = e;
                 }
                 throw err;
             });
     }
 
-    capability_setBooleanState(device, props) {
-         var self = this;
-        var power = 'on';
+    command_setBrightnessState(device, props) { // eslint-disable-line camelcase
+        return lifx.setState(`id:${device.specs.deviceId}`, {
+            power: 'on',
+            brightness: props.colour.brightness,
+            duration: props.duration
+        })
+            .then((result) => {
+                if (result.results[0].status === 'offline') {
+                    const e = new Error('Unable to connect to bulb');
+                    e.type = 'Connection';
+                    throw e;
+                } else if (result.results[0].status !== 'ok') {
+                    const e = new Error(result);
+                    e.type = 'Driver';
+                    throw e;
+                }
+
+                return lifx.listLights(device.specs.deviceId);
+            })
+            .then((response) => {
+                const resp = {
+                    on: response[0].power === 'on',
+                    colour: {
+                        hue: parseInt(response[0].color.hue, 10),
+                        saturation: response[0].color.saturation,
+                        brightness: response[0].brightness
+                    }
+                };
+                this.getStatus(device, (props.duration * 1000) + 1000);
+                return resp;
+            })
+            .catch((e) => {
+                let err;
+                if (!e.type) {
+                    if (e.error === 'Invalid token') {
+                        err = new Error('Not authenticated');
+                        err.type = 'Authentication';
+                    } else if (e.error === 'Token required') {
+                        err = new Error('Not authenticated');
+                        err.type = 'Authentication';
+                    } else if (e.error.startsWith('Unable to parse color')) {
+                        err = new Error('Unable to parse colour');
+                        err.type = 'BadRequest';
+                    } else {
+                        err = new Error(e.error);
+                        err.type = 'Device';
+                    }
+                } else {
+                    err = e;
+                }
+                throw err;
+            });
+    }
+
+    command_toggle(device) { // eslint-disable-line camelcase
+        return lifx.toggle(`id:${device.specs.deviceId}`, {}).then((result) => {
+            if (result.results[0].status === 'offline') {
+                const e = new Error('Unable to connect to bulb');
+                e.type = 'Connection';
+                throw e;
+            } else if (result.results[0].status !== 'ok') {
+                const e = new Error(result);
+                e.type = 'Driver';
+                throw e;
+            }
+            return lifx.listLights(device.specs.deviceId);
+        }).then((response) => {
+            const resp = {
+                on: response[0].power === 'on',
+                colour: {
+                    hue: parseInt(response[0].color.hue, 10),
+                    saturation: response[0].color.saturation,
+                    brightness: response[0].brightness
+                }
+            };
+            this.getStatus(device, 3000);
+            return resp;
+        }).catch((e) => {
+            let err;
+            if (!e.type) {
+                if (e.error === 'Invalid token') {
+                    err = new Error('Not authenticated');
+                    err.type = 'Authentication';
+                } else if (e.error === 'Token required') {
+                    err = new Error('Not authenticated');
+                    err.type = 'Authentication';
+                } else if (e.error.startsWith('Unable to parse color')) {
+                    err = new Error('Unable to parse colour');
+                    err.type = 'BadRequest';
+                } else {
+                    err = new Error(e.error);
+                    err.type = 'Device';
+                }
+            } else {
+                err = e;
+            }
+            throw err;
+        });
+    }
+
+    command_setBooleanState(device, props) { // eslint-disable-line camelcase
+        let power = 'on';
         if (props.on === false) {
             power = 'off';
         }
 
-        return lifx.setState('id:' + device.specs.deviceId, {
-                power: power,
-                duration: props.duration
-            })
-            .then(function(result) {
-                if (result.results[0].status === 'ok') {
-
-                } else if (result.results[0].status === 'offline') {
-                    var e = new Error('Unable to connect to bulb');
+        return lifx.setState(`id:${device.specs.deviceId}`, {
+            power,
+            duration: props.duration
+        })
+            .then((result) => {
+                if (result.results[0].status === 'offline') {
+                    const e = new Error('Unable to connect to bulb');
                     e.type = 'Connection';
                     throw e;
-                } else {
-                    var e = new Error(result);
+                } else if (result.results[0].status !== 'ok') {
+                    const e = new Error(result);
                     e.type = 'Driver';
                     throw e;
                 }
 
                 return lifx.listLights(device.specs.deviceId);
             })
-            .then(function(response) {
+            .then((response) => {
                 const resp = {
                     on: response[0].power === 'on',
                     colour: {
-                        hue: parseInt(response[0].color.hue),
+                        hue: parseInt(response[0].color.hue, 10),
                         saturation: response[0].color.saturation,
                         brightness: response[0].brightness
                     }
                 };
-                self._getStatus(device,(props.duration*1000)+1000);
+                this.getStatus(device, (props.duration * 1000) + 1000);
                 return resp;
             })
-            .catch(function(e) {
+            .catch((e) => {
+                let err;
                 if (!e.type) {
                     if (e.error === 'Invalid token') {
-                        var err = new Error('Not authenticated');
+                        err = new Error('Not authenticated');
                         err.type = 'Authentication';
                     } else if (e.error === 'Token required') {
-                        var err = new Error('Not authenticated');
+                        err = new Error('Not authenticated');
                         err.type = 'Authentication';
                     } else {
-                        var err = new Error(e.error);
+                        err = new Error(e.error);
                         err.type = 'Device';
                     }
                 } else {
-                    var err = e;
+                    err = e;
                 }
                 throw err;
             });
     }
 
-    capability_breatheEffect(device, props) {
-
-        var newProps = {
-            color: this._buildColourString(props.colour.hue, props.colour.saturation, props.colour.brightness),
+    command_breatheEffect(device, props) { // eslint-disable-line camelcase
+        const newProps = {
+            color: this.buildColourString(props.colour.hue, props.colour.saturation, props.colour.brightness),
             period: props.period,
             cycles: props.cycles,
             persist: props.persist,
@@ -372,92 +341,101 @@ class LifxDriver {
             power_on: true
         };
         if (props.fromColour) {
-            newProps.from_color = self._buildColourString(props.fromColour.hue, props.fromColour.saturation, props.fromColour.brightness);
+            newProps.from_color = this.buildColourString(
+              props.fromColour.hue,
+              props.fromColour.saturation,
+              props.fromColour.brightness
+            );
         }
-        return lifx.breathe('id:' + device.specs.deviceId, newProps)
-            .then(function(result) {
+        return lifx.breathe(`id:${device.specs.deviceId}`, newProps)
+            .then((result) => {
                 if (result.results[0].status === 'ok') {
-                    return {
-                        processed: true
+                    const resp = {
+                        breatheEffect: true
                     };
+                    this.eventEmitter.emit('state', 'lifx', device._id, resp);
                 } else if (result.results[0].status === 'offline') {
-                    var e = new Error('Unable to connect to bulb');
+                    const e = new Error('Unable to connect to bulb');
                     e.type = 'Connection';
                     throw e;
                 } else {
-                    var e = new Error(result);
+                    const e = new Error(result);
                     e.type = 'Driver';
                     throw e;
                 }
-
             })
-            .catch(function(e) {
+            .catch((e) => {
+                let err;
                 if (!e.type) {
                     if (e.error === 'Invalid token') {
-                        var err = new Error('Not authenticated');
+                        err = new Error('Not authenticated');
                         err.type = 'Authentication';
                     } else if (e.error === 'Token required') {
-                        var err = new Error('Not authenticated');
+                        err = new Error('Not authenticated');
                         err.type = 'Authentication';
                     } else if (e.error.startsWith('Unable to parse color')) {
-                        var err = new Error('Unable to parse colour');
+                        err = new Error('Unable to parse colour');
                         err.type = 'BadRequest';
                     } else {
-                        var err = new Error(e.error);
+                        err = new Error(e.error);
                         err.type = 'Device';
                     }
                 } else {
-                    var err = e;
+                    err = e;
                 }
                 throw err;
             });
     }
 
-    capability_pulseEffect(device, props) {
-        var newProps = {
-            color: this._buildColourString(props.colour.hue, props.colour.saturation, props.colour.brightness),
+    command_pulseEffect(device, props) { // eslint-disable-line camelcase
+        const newProps = {
+            color: this.buildColourString(props.colour.hue, props.colour.saturation, props.colour.brightness),
             period: props.period,
             cycles: props.cycles,
             persist: props.persist,
             power_on: true
         };
         if (props.fromColour) {
-            newProps.from_color = this._buildColourString(props.fromColour.hue, props.fromColour.saturation, props.fromColour.brightness);
+            newProps.from_color = this.buildColourString(
+              props.fromColour.hue,
+              props.fromColour.saturation,
+              props.fromColour.brightness);
         }
-        return lifx.breathe('id:' + device.specs.deviceId, newProps)
-            .then(function(result) {
+        return lifx.breathe(`id:${device.specs.deviceId}`, newProps)
+            .then((result) => {
                 if (result.results[0].status === 'ok') {
-                    return {
-                        processed: true
+                    const resp = {
+                        pulseEffect: true
                     };
+                    this.eventEmitter.emit('state', 'lifx', device._id, resp);
                 } else if (result.results[0].status === 'offline') {
-                    var e = new Error('Unable to connect to bulb');
+                    const e = new Error('Unable to connect to bulb');
                     e.type = 'Connection';
                     throw e;
                 } else {
-                    var e = new Error(result);
+                    const e = new Error(result);
                     e.type = 'Driver';
                     throw e;
                 }
-
             })
-            .catch(function(e) {
+            .catch((e) => {
+                let err;
                 if (!e.type) {
                     if (e.error === 'Invalid token') {
-                        var err = new Error('Not authenticated');
+                        err = new Error('Not authenticated');
                         err.type = 'Authentication';
                     } else if (e.error === 'Token required') {
-                        var err = new Error('Not authenticated');
+                        err = new Error('Not authenticated');
                         err.type = 'Authentication';
                     } else if (e.error.startsWith('Unable to parse color')) {
-                        var err = new Error('Unable to parse colour');
+                        err = new Error('Unable to parse colour');
                         err.type = 'BadRequest';
                     } else {
-                        var err = new Error(e.error);
+                        err = new Error(e.error);
                         err.type = 'Device';
                     }
                 } else {
-                    var err = e;
+                    err = e;
                 }
                 throw err;
             });
