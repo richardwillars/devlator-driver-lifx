@@ -49,7 +49,7 @@ class LifxDriver {
                         brightness: response[0].brightness
                     }
                 };
-                this.eventEmitter.emit('state', 'lifx', device._id, resp);
+                this.eventEmitter.emit('lightState', 'lifx', device._id, resp);
             });
         }, delay);
     }
@@ -62,14 +62,7 @@ class LifxDriver {
                 url: 'https://cloud.lifx.com/settings',
                 label: 'Get access token'
             },
-            dataLabel: 'Access token',
-            next: {
-                http: '/authenticate/lifx/0',
-                socket: {
-                    event: 'authenticationStep',
-                    step: 0
-                }
-            }
+            dataLabel: 'Access token'
         }];
     }
 
@@ -108,7 +101,9 @@ class LifxDriver {
                             pulseEffect: true
                         },
                         events: {
-                            state: true
+                            lightState: true,
+                            pulseLightEffect: true,
+                            breatheLightEffect: true
                         }
                     };
                     devices.push(device);
@@ -353,7 +348,7 @@ class LifxDriver {
                     const resp = {
                         breatheEffect: true
                     };
-                    this.eventEmitter.emit('state', 'lifx', device._id, resp);
+                    this.eventEmitter.emit('breatheLightEffect', 'lifx', device._id, resp);
                 } else if (result.results[0].status === 'offline') {
                     const e = new Error('Unable to connect to bulb');
                     e.type = 'Connection';
@@ -401,13 +396,13 @@ class LifxDriver {
               props.fromColour.saturation,
               props.fromColour.brightness);
         }
-        return lifx.breathe(`id:${device.specs.deviceId}`, newProps)
+        return lifx.pulse(`id:${device.specs.deviceId}`, newProps)
             .then((result) => {
                 if (result.results[0].status === 'ok') {
                     const resp = {
                         pulseEffect: true
                     };
-                    this.eventEmitter.emit('state', 'lifx', device._id, resp);
+                    this.eventEmitter.emit('pulseLightEffect', 'lifx', device._id, resp);
                 } else if (result.results[0].status === 'offline') {
                     const e = new Error('Unable to connect to bulb');
                     e.type = 'Connection';
