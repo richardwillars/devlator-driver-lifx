@@ -1,22 +1,20 @@
-const initDevices = async (devices) => {
+const initDevices = async () => {};
 
-};
-
-const handleLifxError = (e) => {
+const handleLifxError = e => {
   let err;
   if (!e.type) {
-    if (e.error === 'Invalid token') {
-      err = new Error('Not authenticated');
-      err.type = 'Authentication';
-    } else if (e.error === 'Token required') {
-      err = new Error('Not authenticated');
-      err.type = 'Authentication';
-    } else if (e.error.startsWith('Unable to parse color')) {
-      err = new Error('Unable to parse colour');
-      err.type = 'BadRequest';
+    if (e.error === "Invalid token") {
+      err = new Error("Not authenticated");
+      err.type = "Authentication";
+    } else if (e.error === "Token required") {
+      err = new Error("Not authenticated");
+      err.type = "Authentication";
+    } else if (e.error.startsWith("Unable to parse color")) {
+      err = new Error("Unable to parse colour");
+      err.type = "BadRequest";
     } else {
       err = new Error(e.error);
-      err.type = 'Device';
+      err.type = "Device";
     }
   } else {
     err = e;
@@ -24,20 +22,21 @@ const handleLifxError = (e) => {
   throw err;
 };
 
-const buildColourString = (hue, sat, bri) => `hue:${hue} saturation:${sat} brightness:${bri}`;
+const buildColourString = (hue, sat, bri) =>
+  `hue:${hue} saturation:${sat} brightness:${bri}`;
 
 const getStatus = (device, delay, lifx, events, createEvent) => {
   setTimeout(() => {
-    lifx.listLights(device.specs.originalId).then((response) => {
+    lifx.listLights(device.originalId).then(response => {
       const payload = {
-        on: response[0].power === 'on',
+        on: response[0].power === "on",
         colour: {
           hue: parseInt(response[0].color.hue, 10),
           saturation: response[0].color.saturation,
-          brightness: response[0].brightness,
-        },
+          brightness: response[0].brightness
+        }
       };
-      createEvent(events.LIGHT_STATE, device._id, payload);
+      createEvent(events.LIGHT_STATE, device.deviceId, payload);
     });
   }, delay);
 };
@@ -54,280 +53,333 @@ const discover = async (lifx, events) => {
         toggle: true,
         setBooleanState: true,
         breatheEffect: true,
-        pulseEffect: true,
+        pulseEffect: true
       },
       events: {
         [events.LIGHT_STATE]: true,
         [events.PULSE_LIGHT_EFFECT]: true,
-        [events.BREATHE_LIGHT_EFFECT]: true,
-      },
+        [events.BREATHE_LIGHT_EFFECT]: true
+      }
     }));
   } catch (err) {
     const error = err;
-    error.type = 'Authentication';
+    error.type = "Authentication";
     throw error;
   }
 };
 
-const getAuthenticationProcess = () => [{
-  type: 'RequestData',
-  message: 'In order to use LIFX bulbs you must provide an access token. This can be obtained from your LIFX account settings', // eslint-disable-line max-len
-  button: {
-    url: 'https://cloud.lifx.com/settings',
-    label: 'Get access token',
-  },
-  dataLabel: 'Access token',
-}];
+const getAuthenticationProcess = () => [
+  {
+    type: "RequestData",
+    message:
+      "In order to use LIFX bulbs you must provide an access token. This can be obtained from your LIFX account settings", // eslint-disable-line max-len
+    button: {
+      url: "https://cloud.lifx.com/settings",
+      label: "Get access token"
+    },
+    dataLabel: "Access token"
+  }
+];
 
-const authenticationStep0 = async (props, updateSettings, lifx) => {
+const authenticationStep0 = async (props, updateSettings, lifx, events) => {
   const newSettings = {
-    token: props.data,
+    token: props.data
   };
   try {
     await updateSettings(newSettings);
     lifx.init(newSettings.token);
 
     // check if the token is valid by calling discover
-    await discover();
+    await discover(lifx, events);
 
     return {
       success: true,
+      message: "Authenticated"
     };
   } catch (err) {
     return {
       success: false,
-      message: err.error,
+      message: err.error || err.message
     };
   }
 };
-
 
 const commandSetHSBState = async (device, props, lifx, events, createEvent) => {
   try {
-    const result = await lifx.setState(`id:${device.specs.originalId}`, {
-      power: 'on',
-      color: buildColourString(props.colour.hue, props.colour.saturation, props.colour.brightness),
-      duration: props.duration,
+    const result = await lifx.setState(`id:${device.originalId}`, {
+      power: "on",
+      color: buildColourString(
+        props.colour.hue,
+        props.colour.saturation,
+        props.colour.brightness
+      ),
+      duration: props.duration
     });
 
-    if (result.results[0].status === 'offline') {
-      const e = new Error('Unable to connect to bulb');
-      e.type = 'Connection';
+    if (result.results[0].status === "offline") {
+      const e = new Error("Unable to connect to bulb");
+      e.type = "Connection";
       throw e;
-    } else if (result.results[0].status !== 'ok') {
+    } else if (result.results[0].status !== "ok") {
       const e = new Error(result);
-      e.type = 'Driver';
+      e.type = "Driver";
       throw e;
     }
 
-    const response = await lifx.listLights(device.specs.originalId);
+    const response = await lifx.listLights(device.originalId);
 
     const resp = {
-      on: response[0].power === 'on',
+      on: response[0].power === "on",
       colour: {
         hue: parseInt(response[0].color.hue, 10),
         saturation: response[0].color.saturation,
-        brightness: response[0].brightness,
-      },
+        brightness: response[0].brightness
+      }
     };
-    getStatus(device, (props.duration * 1000) + 1000, lifx, events, createEvent);
+    getStatus(device, props.duration * 1000 + 1000, lifx, events, createEvent);
     return resp;
   } catch (e) {
     handleLifxError(e);
+    return null;
   }
 };
 
-const commandSetBrightnessState = async (device, props, lifx, events, createEvent) => {
+const commandSetBrightnessState = async (
+  device,
+  props,
+  lifx,
+  events,
+  createEvent
+) => {
   try {
-    const result = await lifx.setState(`id:${device.specs.originalId}`, {
-      power: 'on',
+    const result = await lifx.setState(`id:${device.originalId}`, {
+      power: "on",
       brightness: props.colour.brightness,
-      duration: props.duration,
+      duration: props.duration
     });
-    if (result.results[0].status === 'offline') {
-      const e = new Error('Unable to connect to bulb');
-      e.type = 'Connection';
+    if (result.results[0].status === "offline") {
+      const e = new Error("Unable to connect to bulb");
+      e.type = "Connection";
       throw e;
-    } else if (result.results[0].status !== 'ok') {
+    } else if (result.results[0].status !== "ok") {
       const e = new Error(result);
-      e.type = 'Driver';
+      e.type = "Driver";
       throw e;
     }
 
-    const response = await lifx.listLights(device.specs.originalId);
+    const response = await lifx.listLights(device.originalId);
 
     const resp = {
-      on: response[0].power === 'on',
+      on: response[0].power === "on",
       colour: {
         hue: parseInt(response[0].color.hue, 10),
         saturation: response[0].color.saturation,
-        brightness: response[0].brightness,
-      },
+        brightness: response[0].brightness
+      }
     };
-    getStatus(device, (props.duration * 1000) + 1000, lifx, events, createEvent);
+    getStatus(device, props.duration * 1000 + 1000, lifx, events, createEvent);
     return resp;
   } catch (e) {
     handleLifxError(e);
+    return null;
   }
 };
 
 const commandToggle = async (device, lifx, events, createEvent) => {
   try {
-    const result = await lifx.toggle(`id:${device.specs.originalId}`, {});
-    if (result.results[0].status === 'offline') {
-      const e = new Error('Unable to connect to bulb');
-      e.type = 'Connection';
+    const result = await lifx.toggle(`id:${device.originalId}`, {});
+    if (result.results[0].status === "offline") {
+      const e = new Error("Unable to connect to bulb");
+      e.type = "Connection";
       throw e;
-    } else if (result.results[0].status !== 'ok') {
+    } else if (result.results[0].status !== "ok") {
       const e = new Error(result);
-      e.type = 'Driver';
+      e.type = "Driver";
       throw e;
     }
-    const response = await lifx.listLights(device.specs.originalId);
+    const response = await lifx.listLights(device.originalId);
 
     const resp = {
-      on: response[0].power === 'on',
+      on: response[0].power === "on",
       colour: {
         hue: parseInt(response[0].color.hue, 10),
         saturation: response[0].color.saturation,
-        brightness: response[0].brightness,
-      },
+        brightness: response[0].brightness
+      }
     };
     getStatus(device, 3000, lifx, events, createEvent);
     return resp;
   } catch (e) {
     handleLifxError(e);
+    return null;
   }
 };
 
-const commandSetBooleanState = async (device, props, lifx, events, createEvent) => { // eslint-disable-line camelcase
+const commandSetBooleanState = async (
+  device,
+  props,
+  lifx,
+  events,
+  createEvent
+) => {
+  // eslint-disable-line camelcase
   try {
-    let power = 'on';
+    let power = "on";
     if (props.on === false) {
-      power = 'off';
+      power = "off";
     }
 
-    const result = await lifx.setState(`id:${device.specs.originalId}`, {
+    const result = await lifx.setState(`id:${device.originalId}`, {
       power,
-      duration: props.duration,
+      duration: props.duration
     });
-    if (result.results[0].status === 'offline') {
-      const e = new Error('Unable to connect to bulb');
-      e.type = 'Connection';
+    if (result.results[0].status === "offline") {
+      const e = new Error("Unable to connect to bulb");
+      e.type = "Connection";
       throw e;
-    } else if (result.results[0].status !== 'ok') {
+    } else if (result.results[0].status !== "ok") {
       const e = new Error(result);
-      e.type = 'Driver';
+      e.type = "Driver";
       throw e;
     }
 
-    const response = await lifx.listLights(device.specs.originalId);
+    const response = await lifx.listLights(device.originalId);
 
     const resp = {
-      on: response[0].power === 'on',
+      on: response[0].power === "on",
       colour: {
         hue: parseInt(response[0].color.hue, 10),
         saturation: response[0].color.saturation,
-        brightness: response[0].brightness,
-      },
+        brightness: response[0].brightness
+      }
     };
-    getStatus(device, (props.duration * 1000) + 1000, lifx, events, createEvent);
+    getStatus(device, props.duration * 1000 + 1000, lifx, events, createEvent);
     return resp;
   } catch (e) {
     handleLifxError(e);
+    return null;
   }
 };
 
-const commandBreatheEffect = async (device, props, lifx, events, createEvent) => { // eslint-disable-line camelcase
+const commandBreatheEffect = async (
+  device,
+  props,
+  lifx,
+  events,
+  createEvent
+) => {
   try {
     const newProps = {
-      color: buildColourString(props.colour.hue, props.colour.saturation, props.colour.brightness),
+      color: buildColourString(
+        props.colour.hue,
+        props.colour.saturation,
+        props.colour.brightness
+      ),
       period: props.period,
       cycles: props.cycles,
       persist: props.persist,
       peak: props.peak,
-      power_on: true,
+      power_on: true
     };
     if (props.fromColour) {
       newProps.from_color = buildColourString(
         props.fromColour.hue,
         props.fromColour.saturation,
-        props.fromColour.brightness,
+        props.fromColour.brightness
       );
     }
-    const result = await lifx.breathe(`id:${device.specs.originalId}`, newProps);
+    const result = await lifx.breathe(`id:${device.originalId}`, newProps);
 
-    if (result.results[0].status === 'ok') {
+    if (result.results[0].status === "ok") {
       const resp = {
-        breatheEffect: true,
+        breatheEffect: true
       };
-      createEvent(events.BREATHE_LIGHT_EFFECT, device._id, resp);
-    } else if (result.results[0].status === 'offline') {
-      const e = new Error('Unable to connect to bulb');
-      e.type = 'Connection';
+      createEvent(events.BREATHE_LIGHT_EFFECT, device.deviceId, resp);
+      return resp;
+    } else if (result.results[0].status === "offline") {
+      const e = new Error("Unable to connect to bulb");
+      e.type = "Connection";
       throw e;
     } else {
       const e = new Error(result);
-      e.type = 'Driver';
+      e.type = "Driver";
       throw e;
     }
   } catch (e) {
-    handleLifxError(e);
+    return handleLifxError(e);
   }
 };
 
-const commandPulseEffect = async (device, props, lifx, events, createEvent) => { // eslint-disable-line camelcase
+const commandPulseEffect = async (device, props, lifx, events, createEvent) => {
+  // eslint-disable-line camelcase
   try {
     const newProps = {
-      color: buildColourString(props.colour.hue, props.colour.saturation, props.colour.brightness),
+      color: buildColourString(
+        props.colour.hue,
+        props.colour.saturation,
+        props.colour.brightness
+      ),
       period: props.period,
       cycles: props.cycles,
       persist: props.persist,
-      power_on: true,
+      power_on: true
     };
     if (props.fromColour) {
       newProps.from_color = buildColourString(
         props.fromColour.hue,
         props.fromColour.saturation,
-        props.fromColour.brightness,
+        props.fromColour.brightness
       );
     }
-    const result = await lifx.pulse(`id:${device.specs.originalId}`, newProps);
+    const result = await lifx.pulse(`id:${device.originalId}`, newProps);
 
-    if (result.results[0].status === 'ok') {
+    if (result.results[0].status === "ok") {
       const resp = {
-        pulseEffect: true,
+        pulseEffect: true
       };
-      createEvent(events.PULSE_LIGHT_EFFECT, device._id, resp);
-    } else if (result.results[0].status === 'offline') {
-      const e = new Error('Unable to connect to bulb');
-      e.type = 'Connection';
+      createEvent(events.PULSE_LIGHT_EFFECT, device.deviceId, resp);
+      return resp;
+    } else if (result.results[0].status === "offline") {
+      const e = new Error("Unable to connect to bulb");
+      e.type = "Connection";
       throw e;
     } else {
       const e = new Error(result);
-      e.type = 'Driver';
+      e.type = "Driver";
       throw e;
     }
   } catch (e) {
     handleLifxError(e);
+    return null;
   }
 };
 
-
-module.exports = async (getSettings, updateSettings, commsInterface, lifx, events, createEvent) => {
+module.exports = async (
+  getSettings,
+  updateSettings,
+  commsInterface,
+  lifx,
+  events,
+  createEvent
+) => {
   const settings = await getSettings();
   lifx.init(settings.token);
-
   return {
     initDevices: devices => initDevices(devices),
     authentication_getSteps: getAuthenticationProcess,
-    authentication_step0: props => authenticationStep0(props, updateSettings, lifx),
+    authentication_step0: props =>
+      authenticationStep0(props, updateSettings, lifx, events),
     discover: () => discover(lifx, events),
-    command_setHSBState: (device, props) => commandSetHSBState(device, props, lifx, events, createEvent),
-    command_setBrightnessState: (device, props) => commandSetBrightnessState(device, props, lifx, events, createEvent),
+    command_setHSBState: (device, props) =>
+      commandSetHSBState(device, props, lifx, events, createEvent),
+    command_setBrightnessState: (device, props) =>
+      commandSetBrightnessState(device, props, lifx, events, createEvent),
     command_toggle: device => commandToggle(device, lifx, events, createEvent),
-    command_setBooleanState: (device, props) => commandSetBooleanState(device, props, lifx, events, createEvent),
-    command_breatheEffect: (device, props) => commandBreatheEffect(device, props, lifx, events, createEvent),
-    command_pulseEffect: (device, props) => commandPulseEffect(device, props, lifx, events, createEvent),
+    command_setBooleanState: (device, props) =>
+      commandSetBooleanState(device, props, lifx, events, createEvent),
+    command_breatheEffect: (device, props) =>
+      commandBreatheEffect(device, props, lifx, events, createEvent),
+    command_pulseEffect: (device, props) =>
+      commandPulseEffect(device, props, lifx, events, createEvent)
   };
 };
